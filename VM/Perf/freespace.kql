@@ -1,0 +1,14 @@
+Perf
+| where TimeGenerated > ago(1d)
+| where ObjectName == "LogicalDisk" or // The object name used in Windows records
+ObjectName == "Logical Disk" // The object name used in Linux records
+| where CounterName == "Free Megabytes" or CounterName =="% Free Space" or CounterName == "% Used Space" // Filters for the performance counters Free Megabytes, % Free Space, and % Used Space performance counters
+| where InstanceName == "_Total"  // Retrieves data related to free space for all drives on a virtual disk  
+| summarize arg_max(TimeGenerated, CounterValue) by Computer, CounterName // Retrieves the last counter value collected for each counter for every virtual machine
+| extend CounterValue = iff(CounterName=="% Used Space", 100-CounterValue, CounterValue) // Converts % Used Space to % Free Space
+| extend CounterName = iff(CounterName=="% Used Space", "% Free Space", CounterName) // Changes the column name from % Used Space to % Free Space
+| extend CounterValue = iff(CounterName=="Free Megabytes", (CounterValue)*0.001, CounterValue) Converts megabytes to gygabytes
+| extend CounterName= iff(CounterName=="Free Megabytes", "OverallFreeSpaceInGB", CounterName) Changes the column name fromFree Megabytes to OverallFreeSpaceInGB
+| extend packed = pack(CounterName, CounterValue) // Groups together CounterName-CounterValue key-value pairs
+| summarize SpaceStats = make_bag(packed) by Computer // Summarizes free space statstics by computer
+| where SpaceStats.["% Free Space"]<= 50
