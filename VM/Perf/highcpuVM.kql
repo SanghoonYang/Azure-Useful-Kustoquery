@@ -1,0 +1,8 @@
+Perf  // The table you’re querying
+| where TimeGenerated > ago(1d) and ObjectName == "Processor" and CounterName == "% Processor Time" and InstanceName == "_Total" // Filters for entries generated in the past day related to total processor time measurements  
+| summarize min(CounterValue), avg(CounterValue), max(CounterValue), percentiles(CounterValue, 90,99) by Computer // Presents the minimum, maximum, average, 90th and 99th percentile counter values for each computer 
+| where percentile_CounterValue_90 > 80 and percentile_CounterValue_99 > 80 // Filters previous query results for instances where the 90th and 99th percentile counters are higher than 50
+| join kind=inner (Heartbeat // Introduces data from the "Heartbeat" table to the previous query results
+| where TimeGenerated > ago(1d) // Time range for the data added from the "Heartbeat" table
+| distinct Computer, OSType) on Computer // Adds distinct combinations of computer and operating system 
+| project-away Computer1 // Removes the "Computer1" column from the query results
